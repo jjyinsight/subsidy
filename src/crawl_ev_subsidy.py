@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
-async def extract_kg_mobility_data(popup: Page, region: str, vehicle_category: str) -> list[dict]:
+async def extract_kg_mobility_data(popup: Page, sido: str, district: str, vehicle_category: str) -> list[dict]:
     """팝업 테이블에서 케이지모빌리티 데이터 추출"""
     results = []
 
@@ -43,7 +43,8 @@ async def extract_kg_mobility_data(popup: Page, region: str, vehicle_category: s
         total_subsidy = await cells[5].inner_text()
 
         results.append({
-            "지역": region,
+            "시도": sido,
+            "지역구분": district,
             "세부차종": vehicle_category,
             "제조사": manufacturer.strip(),
             "모델명": model.strip(),
@@ -55,20 +56,25 @@ async def extract_kg_mobility_data(popup: Page, region: str, vehicle_category: s
     return results
 
 
-async def get_region_links(page: Page) -> list[tuple[str, str]]:
-    """지역 링크 정보 수집 (지역코드, 지역명)"""
-    links = await page.query_selector_all("a[onclick*='psPopupLocalCarModelPrice']")
+async def get_region_links(page: Page) -> list[tuple[str, str, str]]:
+    """지역 링크 정보 수집 (지역코드, 시도, 지역구분)"""
+    rows = await page.query_selector_all("table tbody tr")
     region_info = []
 
-    for link in links:
-        onclick = await link.get_attribute("onclick")
-        if onclick:
-            # psPopupLocalCarModelPrice('2026','1100','서울특별시') 파싱
-            parts = onclick.split("'")
-            if len(parts) >= 6:
-                region_code = parts[3]
-                region_name = parts[5]
-                region_info.append((region_code, region_name))
+    for row in rows:
+        cells = await row.query_selector_all("td")
+        if len(cells) >= 3:
+            sido = await cells[0].inner_text()      # 시도 (예: 경기)
+            district = await cells[1].inner_text()  # 지역구분 (예: 수원시)
+
+            # onclick에서 지역코드 추출
+            link = await row.query_selector("a[onclick*='psPopupLocalCarModelPrice']")
+            if link:
+                onclick = await link.get_attribute("onclick")
+                if onclick:
+                    parts = onclick.split("'")
+                    region_code = parts[3] if len(parts) >= 4 else ""
+                    region_info.append((region_code, sido.strip(), district.strip()))
 
     return region_info
 
@@ -82,13 +88,13 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
     await page.click(f"text={tab_text}")
     await asyncio.sleep(random.uniform(1.5, 2.5))
 
-    # 지역 링크 정보 가져오기
+    # 지역 링크 정보 가져오기 (지역코드, 시도, 지역구분)
     region_links = await get_region_links(page)
     region_count = len(region_links)
     print(f"[{vehicle_category}] 총 {region_count}개 지역 발견")
 
-    for i, (region_code, region_name) in enumerate(region_links):
-        print(f"  [{i+1}/{region_count}] {region_name} 조회 중...", end=" ", flush=True)
+    for i, (region_code, sido, district) in enumerate(region_links):
+        print(f"  [{i+1}/{region_count}] {sido} {district} 조회 중...", end=" ", flush=True)
 
         try:
             # 팝업 대기 설정
@@ -100,7 +106,7 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
             await asyncio.sleep(random.uniform(0.8, 1.5))
 
             # 데이터 추출
-            data = await extract_kg_mobility_data(popup, region_name, vehicle_category)
+            data = await extract_kg_mobility_data(popup, sido, district, vehicle_category)
             all_data.extend(data)
             print(f"케이지모빌리티 {len(data)}건")
 
@@ -127,25 +133,25 @@ async def crawl_all_regions(page: Page, context: BrowserContext, vehicle_categor
     """전체 지역 크롤링 (개선된 버전)"""
     all_data = []
 
-    # 지역 링크 정보 가져오기
+    # 지역 링크 정보 가져오기 (지역코드, 시도, 지역구분)
     region_links = await get_region_links(page)
     region_count = len(region_links)
     print(f"[{vehicle_category}] 총 {region_count}개 지역 발견")
 
-    for i, (region_code, region_name) in enumerate(region_links):
-        print(f"  [{i+1}/{region_count}] {region_name} 조회 중...", end=" ", flush=True)
+    for i, (region_code, sido, district) in enumerate(region_links):
+        print(f"  [{i+1}/{region_count}] {sido} {district} 조회 중...", end=" ", flush=True)
 
         try:
             # 팝업 대기 설정
             async with context.expect_page(timeout=15000) as popup_info:
                 # 해당 지역 조회 버튼 클릭 (JavaScript evaluate 사용)
-                await page.evaluate(f"psPopupLocalCarModelPrice('2026','{region_code}','{region_name}')")
+                await page.evaluate(f"psPopupLocalCarModelPrice('2026','{region_code}','{district}')")
 
             popup = await popup_info.value
             await asyncio.sleep(random.uniform(0.8, 1.5))
 
             # 데이터 추출
-            data = await extract_kg_mobility_data(popup, region_name, vehicle_category)
+            data = await extract_kg_mobility_data(popup, sido, district, vehicle_category)
             all_data.extend(data)
             print(f"케이지모빌리티 {len(data)}건")
 
@@ -209,7 +215,7 @@ async def main():
 
     # CSV 저장 (BOM 포함 UTF-8 - 엑셀 호환)
     output_file = os.path.join(DATA_DIR, "kg_mobility_subsidy.csv")
-    fieldnames = ["지역", "세부차종", "제조사", "모델명", "국비(만원)", "지방비(만원)", "보조금(만원)"]
+    fieldnames = ["시도", "지역구분", "세부차종", "제조사", "모델명", "국비(만원)", "지방비(만원)", "보조금(만원)"]
 
     # data 폴더 자동 생성
     os.makedirs(DATA_DIR, exist_ok=True)
