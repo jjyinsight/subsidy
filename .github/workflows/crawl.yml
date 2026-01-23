@@ -40,18 +40,18 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          git add data/*.csv reports/*.md
+          git add data/*.csv reports/*.md reports/*.html
           if git diff --staged --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Read report content
+      - name: Read HTML report content
         id: report
         if: steps.changes.outputs.changed == 'true'
         run: |
-          REPORT_FILE=$(ls -t reports/*.md 2>/dev/null | head -1)
+          REPORT_FILE=$(ls -t reports/*.html 2>/dev/null | head -1)
           if [ -n "$REPORT_FILE" ]; then
             echo "content<<EOF" >> $GITHUB_OUTPUT
             cat "$REPORT_FILE" >> $GITHUB_OUTPUT
@@ -77,6 +77,5 @@ jobs:
           subject: "[EV 보조금] 데이터 업데이트 알림"
           to: ${{ secrets.MAIL_TO }}
           from: EV 보조금 크롤러
-          body: ${{ steps.report.outputs.content }}
-          convert_markdown: true
+          html_body: ${{ steps.report.outputs.content }}
           attachments: data/ev_subsidy_data.csv,data/kg_mobility_subsidy.csv
