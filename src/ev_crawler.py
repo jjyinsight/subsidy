@@ -203,8 +203,16 @@ def crawl_ev_subsidy():
             # 버튼 클릭 후 테이블이 일시적으로 비워졌다가 새 데이터가 로드됨
             page.wait_for_load_state('networkidle')
 
-            # 테이블에 데이터가 나타날 때까지 대기 (최대 10초)
+            # 테이블이 비워지는 것을 감지 (최대 5초)
+            # 이전 데이터가 남아있을 수 있으므로 테이블이 비워질 때까지 대기
             main_table = page.locator('table').nth(1)
+            for _ in range(10):
+                row_count = main_table.locator('tbody tr').count()
+                if row_count == 0:
+                    break
+                page.wait_for_timeout(500)
+
+            # 테이블에 새 데이터가 나타날 때까지 대기 (최대 10초)
             for _ in range(20):
                 row_count = main_table.locator('tbody tr').count()
                 if row_count > 0:
