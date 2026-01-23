@@ -1,0 +1,31 @@
+name: EV Subsidy Crawler
+
+on:
+  schedule:
+    - cron: '0 0,3,6,9 * * 1-5'  # 한국시간 9,12,15,18시 (평일)
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install chromium
+          playwright install-deps
+      - name: Run crawlers
+        run: |
+          python crawl_ev_subsidy.py
+          python ev_crawler.py
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add *.csv
+          git diff --staged --quiet || git commit -m "Update EV subsidy data"
+          git push

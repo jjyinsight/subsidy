@@ -6,6 +6,7 @@ ev.or.kr 케이지모빌리티 보조금 데이터 크롤링 스크립트
 
 import asyncio
 import csv
+import random
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 
@@ -14,7 +15,7 @@ async def extract_kg_mobility_data(popup: Page, region: str, vehicle_category: s
     results = []
 
     await popup.wait_for_load_state("load")
-    await asyncio.sleep(1)
+    await asyncio.sleep(random.uniform(0.8, 1.5))
 
     rows = await popup.query_selector_all("table tbody tr")
 
@@ -74,7 +75,7 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
     # 해당 탭 클릭
     print(f"\n[{vehicle_category}] 탭 선택 중...")
     await page.click(f"text={tab_text}")
-    await asyncio.sleep(2)
+    await asyncio.sleep(random.uniform(1.5, 2.5))
 
     # 지역 링크 정보 가져오기
     region_links = await get_region_links(page)
@@ -91,7 +92,7 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
                 await page.click(f"a[onclick*=\"psPopupLocalCarModelPrice('{page.url.split('year1=')[-1][:4] if 'year1=' in page.url else '2026'}','{region_code}'\"]")
 
             popup = await popup_info.value
-            await asyncio.sleep(1)
+            await asyncio.sleep(random.uniform(0.8, 1.5))
 
             # 데이터 추출
             data = await extract_kg_mobility_data(popup, region_name, vehicle_category)
@@ -112,7 +113,7 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
                 pass
             continue
 
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(random.uniform(0.2, 0.5))
 
     return all_data
 
@@ -136,7 +137,7 @@ async def crawl_all_regions(page: Page, context: BrowserContext, vehicle_categor
                 await page.evaluate(f"psPopupLocalCarModelPrice('2026','{region_code}','{region_name}')")
 
             popup = await popup_info.value
-            await asyncio.sleep(1)
+            await asyncio.sleep(random.uniform(0.8, 1.5))
 
             # 데이터 추출
             data = await extract_kg_mobility_data(popup, region_name, vehicle_category)
@@ -157,7 +158,7 @@ async def crawl_all_regions(page: Page, context: BrowserContext, vehicle_categor
                 pass
             continue
 
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(random.uniform(0.2, 0.5))
 
     return all_data
 
@@ -178,34 +179,34 @@ async def main():
         print("\n메인 페이지 접속 중...")
         await page.goto("https://ev.or.kr/nportal/buySupprt/initPsLocalCarPirceAction.do")
         await page.wait_for_load_state("networkidle")
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(1.5, 2.5))
 
         # 2026년 선택
         print("기준년도: 2026년 선택")
         await page.select_option("select#year1", "2026")
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(1.5, 2.5))
 
         # 전기승용 크롤링 (기본 탭 - 먼저 명시적으로 클릭)
         print("\n[전기승용] 탭 선택 중...")
         await page.click("text=전기승용")
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(1.5, 2.5))
         passenger_data = await crawl_all_regions(page, context, "전기승용")
         all_results.extend(passenger_data)
 
         # 전기화물 크롤링
         print("\n[전기화물] 탭 선택 중...")
         await page.click("text=전기화물")
-        await asyncio.sleep(2)
+        await asyncio.sleep(random.uniform(1.5, 2.5))
         cargo_data = await crawl_all_regions(page, context, "전기화물")
         all_results.extend(cargo_data)
 
         await browser.close()
 
-    # CSV 저장 (cp949 인코딩 - 엑셀 호환)
+    # CSV 저장 (BOM 포함 UTF-8 - 엑셀 호환)
     output_file = "kg_mobility_subsidy.csv"
     fieldnames = ["지역", "세부차종", "제조사", "모델명", "국비(만원)", "지방비(만원)", "보조금(만원)"]
 
-    with open(output_file, "w", newline="", encoding="cp949") as f:
+    with open(output_file, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(all_results)
@@ -221,7 +222,7 @@ async def main():
     print(f"전기승용: {passenger_count}건")
     print(f"전기화물: {cargo_count}건")
     print(f"총 데이터: {len(all_results)}건")
-    print(f"\n저장 파일: {output_file} (cp949 인코딩)")
+    print(f"\n저장 파일: {output_file} (utf-8-sig 인코딩)")
 
 
 if __name__ == "__main__":

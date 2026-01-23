@@ -8,13 +8,14 @@ ev.or.kr 전기차 보조금 데이터 크롤러
 from playwright.sync_api import sync_playwright
 import csv
 import re
+import random
 import urllib.robotparser
 import urllib.request
 import urllib.error
 
 URL = "https://ev.or.kr/nportal/buySupprt/initSubsidyPaymentCheckAction.do"
 SCREENSHOT_PATH = "/tmp/ev_page.png"
-CSV_PATH = "/Users/jongyoon-jeon/subside/ev_subsidy_data.csv"
+CSV_PATH = "./ev_subsidy_data.csv"
 
 # 수집할 차종 목록
 VEHICLE_TYPES = ['전기승용', '전기화물']
@@ -165,7 +166,7 @@ def crawl_ev_subsidy():
         print(f"페이지 접속 중: {URL}")
         page.goto(URL, timeout=60000)
         page.wait_for_load_state('networkidle')
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(int(random.uniform(1.5, 3.0) * 1000))
 
         # 스크린샷 저장
         page.screenshot(path=SCREENSHOT_PATH, full_page=True)
@@ -195,7 +196,7 @@ def crawl_ev_subsidy():
 
             # 테이블 갱신 대기
             page.wait_for_load_state('networkidle')
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(int(random.uniform(0.8, 1.5) * 1000))
 
             print(f"[{vtype}] 데이터 추출 중...")
             data = extract_table_data(page)
@@ -213,8 +214,8 @@ def crawl_ev_subsidy():
                 print(f"         민간공고대수: 전체={row[5]}, 우선={row[6]}, 법인={row[7]}, 택시={row[8]}, 일반={row[9]}")
                 print(f"         출고잔여대수: 전체={row[20]}, 우선={row[21]}, 법인={row[22]}, 택시={row[23]}, 일반={row[24]}")
 
-        # CSV 저장 (출처 정보 포함)
-        with open(CSV_PATH, 'w', newline='', encoding='utf-8') as f:
+        # CSV 저장 (출처 정보 포함, BOM 포함 UTF-8로 엑셀 호환)
+        with open(CSV_PATH, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             # 출처 정보를 첫 번째 행에 추가
             writer.writerow([f"# {DATA_SOURCE}"])
