@@ -47,16 +47,13 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Read HTML report content
+      - name: Get report file path
         id: report
         if: steps.changes.outputs.changed == 'true'
         run: |
           REPORT_FILE=$(ls -t reports/*.html 2>/dev/null | head -1)
           if [ -n "$REPORT_FILE" ]; then
-            DELIMITER=$(openssl rand -hex 16)
-            echo "content<<$DELIMITER" >> $GITHUB_OUTPUT
-            cat "$REPORT_FILE" >> $GITHUB_OUTPUT
-            echo "$DELIMITER" >> $GITHUB_OUTPUT
+            echo "file=$REPORT_FILE" >> $GITHUB_OUTPUT
           fi
 
       - name: Commit results
@@ -78,5 +75,8 @@ jobs:
           subject: "[EV 보조금] 데이터 업데이트 알림"
           to: ${{ secrets.MAIL_TO }}
           from: EV 보조금 크롤러
-          html_body: ${{ steps.report.outputs.content }}
-          attachments: data/ev_subsidy_data.csv,data/kg_mobility_subsidy.csv
+          body: |
+            EV 보조금 데이터가 업데이트되었습니다.
+
+            첨부된 HTML 보고서를 확인해주세요.
+          attachments: data/ev_subsidy_data.csv,data/kg_mobility_subsidy.csv,${{ steps.report.outputs.file }}
