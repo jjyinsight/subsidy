@@ -23,7 +23,6 @@ jobs:
           playwright install-deps
       - name: Run crawlers
         run: |
-          python src/crawl_ev_subsidy.py
           python src/ev_crawler.py
 
       - name: Check for changes
