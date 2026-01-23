@@ -12,10 +12,15 @@ import random
 import urllib.robotparser
 import urllib.request
 import urllib.error
+import os
 
 URL = "https://ev.or.kr/nportal/buySupprt/initSubsidyPaymentCheckAction.do"
-SCREENSHOT_PATH = "/tmp/ev_page.png"
-CSV_PATH = "./ev_subsidy_data.csv"
+
+# 스크립트 위치 기준 경로 설정
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+SCREENSHOT_PATH = os.path.join(DATA_DIR, "ev_page.png")
+CSV_PATH = os.path.join(DATA_DIR, "ev_subsidy_data.csv")
 
 # 수집할 차종 목록
 VEHICLE_TYPES = ['전기승용', '전기화물']
@@ -213,6 +218,9 @@ def crawl_ev_subsidy():
                 print(f"  행 {idx+1}: 시도={row[0]}, 지역={row[1]}, 차종={row[2]}")
                 print(f"         민간공고대수: 전체={row[5]}, 우선={row[6]}, 법인={row[7]}, 택시={row[8]}, 일반={row[9]}")
                 print(f"         출고잔여대수: 전체={row[20]}, 우선={row[21]}, 법인={row[22]}, 택시={row[23]}, 일반={row[24]}")
+
+        # data 폴더 자동 생성
+        os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
 
         # CSV 저장 (출처 정보 포함, BOM 포함 UTF-8로 엑셀 호환)
         with open(CSV_PATH, 'w', newline='', encoding='utf-8-sig') as f:

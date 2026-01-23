@@ -7,7 +7,12 @@ ev.or.kr 케이지모빌리티 보조금 데이터 크롤링 스크립트
 import asyncio
 import csv
 import random
+import os
 from playwright.async_api import async_playwright, Page, BrowserContext
+
+# 스크립트 위치 기준 경로 설정
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
 async def extract_kg_mobility_data(popup: Page, region: str, vehicle_category: str) -> list[dict]:
@@ -203,8 +208,11 @@ async def main():
         await browser.close()
 
     # CSV 저장 (BOM 포함 UTF-8 - 엑셀 호환)
-    output_file = "kg_mobility_subsidy.csv"
+    output_file = os.path.join(DATA_DIR, "kg_mobility_subsidy.csv")
     fieldnames = ["지역", "세부차종", "제조사", "모델명", "국비(만원)", "지방비(만원)", "보조금(만원)"]
+
+    # data 폴더 자동 생성
+    os.makedirs(DATA_DIR, exist_ok=True)
 
     with open(output_file, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
