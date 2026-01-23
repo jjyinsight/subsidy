@@ -6,8 +6,11 @@ ev_subsidy_data.csv와 kg_mobility_subsidy.csv의 변화를 분석하여 보고�
 
 import csv
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
+
+# 한국 시간대 (UTC+9)
+KST = timezone(timedelta(hours=9))
 
 
 # 스크립트 위치 기준 경로 설정
@@ -276,7 +279,7 @@ class KGMobilityReportGenerator:
 
 def generate_full_report() -> str:
     """전체 보고서 생성"""
-    now = datetime.now()
+    now = datetime.now(KST)
 
     lines = []
     lines.append("# EV 보조금 데이터 변화 보고서")
@@ -304,7 +307,7 @@ def save_report(content: str) -> str:
     """보고서를 파일로 저장"""
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    now = datetime.now()
+    now = datetime.now(KST)
     filename = f"report_{now.strftime('%Y%m%d_%H%M%S')}.md"
     filepath = os.path.join(REPORTS_DIR, filename)
 
@@ -454,7 +457,7 @@ def _build_html_section(title: str, content: str) -> str:
 
 def generate_html_report() -> str:
     """HTML 보고서 생성 (이메일용)"""
-    now = datetime.now()
+    now = datetime.now(KST)
 
     html = [
         '<!DOCTYPE html>',
@@ -570,7 +573,7 @@ def save_html_report(content: str) -> str:
     """HTML 보고서를 파일로 저장"""
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    now = datetime.now()
+    now = datetime.now(KST)
     filename = f"report_{now.strftime('%Y%m%d_%H%M%S')}.html"
     filepath = os.path.join(REPORTS_DIR, filename)
 
