@@ -3,7 +3,7 @@ name: EV Subsidy Crawler
 on:
   schedule:
     - cron: '0 23 * * 0-4'       # 한국시간 8시 (월-금)
-    - cron: '0 2,5,8 * * 1-5'    # 한국시간 11,14,17시 (월-금)
+    - cron: '0 6 * * 1-5'    # 한국시간 11,14,17시 (월-금)
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
@@ -21,18 +21,42 @@ jobs:
           pip install playwright
           playwright install chromium
           playwright install-deps
+      - name: Backup previous data
+        run: |
+          if [ -f data/ev_subsidy_data.csv ]; then
+            cp data/ev_subsidy_data.csv data/ev_subsidy_data_prev.csv
+          fi
+          if [ -f data/kg_mobility_subsidy.csv ]; then
+            cp data/kg_mobility_subsidy.csv data/kg_mobility_subsidy_prev.csv
+          fi
+
       - name: Run crawlers
         run: |
+          python src/crawl_ev_subsidy.py
           python src/ev_crawler.py
+
+      - name: Generate report
+        run: python src/report_generator.py
 
       - name: Check for changes
         id: changes
         run: |
-          git add data/*.csv
+          git add data/*.csv reports/*.md
           if git diff --staged --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
             echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Read report content
+        id: report
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          REPORT_FILE=$(ls -t reports/*.md 2>/dev/null | head -1)
+          if [ -n "$REPORT_FILE" ]; then
+            echo "content<<EOF" >> $GITHUB_OUTPUT
+            cat "$REPORT_FILE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
           fi
 
       - name: Commit results
@@ -54,10 +78,6 @@ jobs:
           subject: "[EV 보조금] 데이터 업데이트 알림"
           to: ${{ secrets.MAIL_TO }}
           from: EV 보조금 크롤러
-          body: |
-            EV 보조금 데이터가 업데이트되었습니다.
-
-            업데이트 시간: ${{ github.event.head_commit.timestamp || 'N/A' }}
-
-            GitHub에서 확인:
-            https://github.com/${{ github.repository }}/tree/main/data
+          body: ${{ steps.report.outputs.content }}
+          convert_markdown: true
+          attachments: data/ev_subsidy_data.csv,data/kg_mobility_subsidy.csv
