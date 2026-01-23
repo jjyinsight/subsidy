@@ -199,9 +199,19 @@ def crawl_ev_subsidy():
             button = page.get_by_role("link", name=vtype, exact=True)
             button.click()
 
-            # 테이블 갱신 대기
+            # 테이블 데이터 로딩 완료 대기
+            # 버튼 클릭 후 테이블이 일시적으로 비워졌다가 새 데이터가 로드됨
             page.wait_for_load_state('networkidle')
-            page.wait_for_timeout(int(random.uniform(0.8, 1.5) * 1000))
+
+            # 테이블에 데이터가 나타날 때까지 대기 (최대 10초)
+            main_table = page.locator('table').nth(1)
+            for _ in range(20):
+                row_count = main_table.locator('tbody tr').count()
+                if row_count > 0:
+                    break
+                page.wait_for_timeout(500)
+
+            page.wait_for_timeout(int(random.uniform(0.5, 1.0) * 1000))
 
             print(f"[{vtype}] 데이터 추출 중...")
             data = extract_table_data(page)
