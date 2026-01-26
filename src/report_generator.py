@@ -32,17 +32,15 @@ class EVSubsidyReportGenerator:
             return []
 
         data = []
-        # 여러 인코딩 시도
         encodings = ["utf-8-sig", "utf-8", "cp949", "euc-kr"]
         for encoding in encodings:
             try:
                 with open(filepath, "r", encoding=encoding) as f:
+                    first_line = f.readline()
+                    if not first_line.startswith("#"):
+                        f.seek(0)
                     reader = csv.DictReader(f)
-                    # 첫 번째 행이 주석인 경우 건너뛰기
                     for row in reader:
-                        # 시도 컬럼이 #으로 시작하면 건너뛰기 (주석 행)
-                        if row.get("시도", "").startswith("#"):
-                            continue
                         data.append(row)
                 return data
             except UnicodeDecodeError:
@@ -68,6 +66,25 @@ class EVSubsidyReportGenerator:
                 pass
 
         return summary
+
+    def generate_regional_totals(self, data: list[dict]) -> dict:
+        totals = defaultdict(lambda: {"지역수": 0, "민간공고대수_일반": 0, "출고잔여대수_전체": 0})
+
+        for row in data:
+            sido = row.get("시도", "")
+            totals[sido]["지역수"] += 1
+
+            try:
+                totals[sido]["민간공고대수_일반"] += int(row.get("민간공고대수_일반", 0) or 0)
+            except ValueError:
+                pass
+
+            try:
+                totals[sido]["출고잔여대수_전체"] += int(row.get("출고잔여대수_전체", 0) or 0)
+            except ValueError:
+                pass
+
+        return totals
 
     def detect_changes(self, current_data: list[dict], prev_data: list[dict]) -> list[dict]:
         """이전 데이터 대비 유의미한 변화 감지"""
@@ -127,7 +144,16 @@ class EVSubsidyReportGenerator:
             lines.append("")
             return lines
 
-        # 시도/차종별 현황
+        regional_totals = self.generate_regional_totals(current_data)
+        lines.append("### 지역별 총계")
+        lines.append("| 시도 | 지역수 | 민간공고대수_일반 합계 | 출고잔여대수_전체 합계 |")
+        lines.append("|------|--------|------------------------|------------------------|")
+
+        for sido, stats in sorted(regional_totals.items()):
+            lines.append(f"| {sido} | {stats['지역수']} | {stats['민간공고대수_일반']:,} | {stats['출고잔여대수_전체']:,} |")
+
+        lines.append("")
+
         lines.append("### 시도/차종별 현황")
         lines.append("| 시도 | 차종 | 지역수 | 민간공고대수_일반 합계 | 출고잔여대수_전체 합계 |")
         lines.append("|------|------|--------|------------------------|------------------------|")
@@ -482,7 +508,19 @@ def generate_html_report() -> str:
     if not current_data:
         html.append('<p class="no-data">데이터가 없습니다.</p>')
     else:
-        # 시도/차종별 현황 테이블
+        html.append('<h3>지역별 총계</h3>')
+        regional_totals = ev_generator.generate_regional_totals(current_data)
+        headers = ['시도', '지역수', '민간공고대수', '출고잔여대수']
+        rows = []
+        for sido, stats in sorted(regional_totals.items()):
+            rows.append([
+                sido,
+                str(stats['지역수']),
+                f"{stats['민간공고대수_일반']:,}",
+                f"{stats['출고잔여대수_전체']:,}"
+            ])
+        html.append(_build_html_table(headers, rows))
+
         html.append('<h3>시도/차종별 현황</h3>')
         summary = ev_generator.generate_summary(current_data)
         headers = ['시도', '차종', '지역수', '민간공고대수', '출고잔여대수']
