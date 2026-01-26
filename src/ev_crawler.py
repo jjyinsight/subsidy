@@ -193,39 +193,47 @@ def crawl_ev_subsidy():
 
         # 차종별 데이터 수집
         for vtype in VEHICLE_TYPES:
-            print(f"\n[{vtype}] 버튼 클릭 중...")
+            MAX_RETRIES = 3
+            RETRY_DELAY_SEC = 5
 
-            # 차종 버튼 클릭 (링크 버튼으로 특정)
-            button = page.get_by_role("link", name=vtype, exact=True)
-            button.click()
+            for attempt in range(MAX_RETRIES):
+                if attempt > 0:
+                    print(f"[{vtype}] 재시도 {attempt}/{MAX_RETRIES-1} ({RETRY_DELAY_SEC}초 대기 후)...")
+                    page.wait_for_timeout(RETRY_DELAY_SEC * 1000)
 
-            # 테이블 데이터 로딩 완료 대기
-            # 버튼 클릭 후 테이블이 일시적으로 비워졌다가 새 데이터가 로드됨
-            page.wait_for_load_state('networkidle')
+                print(f"\n[{vtype}] 버튼 클릭 중...")
 
-            # 테이블이 비워지는 것을 감지 (최대 5초)
-            # 이전 데이터가 남아있을 수 있으므로 테이블이 비워질 때까지 대기
-            main_table = page.locator('table').nth(1)
-            for _ in range(10):
-                row_count = main_table.locator('tbody tr').count()
-                if row_count == 0:
+                button = page.get_by_role("link", name=vtype, exact=True)
+                button.click()
+
+                page.wait_for_load_state('networkidle')
+
+                main_table = page.locator('table').nth(1)
+                for _ in range(10):
+                    row_count = main_table.locator('tbody tr').count()
+                    if row_count == 0:
+                        break
+                    page.wait_for_timeout(500)
+
+                for _ in range(20):
+                    row_count = main_table.locator('tbody tr').count()
+                    if row_count > 0:
+                        break
+                    page.wait_for_timeout(500)
+
+                page.wait_for_timeout(int(random.uniform(0.5, 1.0) * 1000))
+
+                print(f"[{vtype}] 데이터 추출 중...")
+                data = extract_table_data(page)
+                print(f"[{vtype}] 추출된 행: {len(data)}개")
+
+                if len(data) > 0:
+                    all_data.extend(data)
                     break
-                page.wait_for_timeout(500)
-
-            # 테이블에 새 데이터가 나타날 때까지 대기 (최대 10초)
-            for _ in range(20):
-                row_count = main_table.locator('tbody tr').count()
-                if row_count > 0:
-                    break
-                page.wait_for_timeout(500)
-
-            page.wait_for_timeout(int(random.uniform(0.5, 1.0) * 1000))
-
-            print(f"[{vtype}] 데이터 추출 중...")
-            data = extract_table_data(page)
-            print(f"[{vtype}] 추출된 행: {len(data)}개")
-
-            all_data.extend(data)
+                elif attempt < MAX_RETRIES - 1:
+                    print(f"[{vtype}] 데이터 없음 - 재시도 예정")
+                else:
+                    print(f"[{vtype}] 경고: {MAX_RETRIES}회 시도 후에도 데이터 없음")
 
         print(f"\n전체 데이터: {len(all_data)}행")
 

@@ -2,8 +2,10 @@ name: EV Subsidy Crawler
 
 on:
   schedule:
-    - cron: '0 23 * * 0-4'       # 한국시간 8시 (월-금)
-    - cron: '0 6 * * 1-5'    # 한국시간 11,14,17시 (월-금)
+    # 정각(minute 0)은 GitHub Actions 고부하 시간이므로 피함
+    # 참고: https://docs.github.com/en/actions/how-tos/troubleshoot-workflows#scheduled-workflows-running-at-unexpected-times
+    - cron: '17 23 * * 0-4'      # UTC 23:17 = KST 08:17 (월-금)
+    - cron: '17 6 * * 1-5'       # UTC 06:17 = KST 15:17 (월-금)
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
