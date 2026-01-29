@@ -166,119 +166,144 @@ def crawl_ev_subsidy():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        try:
+            page = browser.new_page()
 
-        print(f"페이지 접속 중: {URL}")
-        page.goto(URL, timeout=60000)
-        page.wait_for_load_state('networkidle')
-        page.wait_for_timeout(int(random.uniform(1.5, 3.0) * 1000))
+            print(f"페이지 접속 중: {URL}")
+            page.goto(URL, timeout=60000)
+            page.wait_for_load_state('networkidle')
+            page.wait_for_timeout(int(random.uniform(1.5, 3.0) * 1000))
 
-        # 스크린샷 저장
-        page.screenshot(path=SCREENSHOT_PATH, full_page=True)
-        print(f"스크린샷 저장: {SCREENSHOT_PATH}")
-        print(f"페이지 타이틀: {page.title()}")
+            # 스크린샷 저장
+            page.screenshot(path=SCREENSHOT_PATH, full_page=True)
+            print(f"스크린샷 저장: {SCREENSHOT_PATH}")
+            print(f"페이지 타이틀: {page.title()}")
 
-        # 확장된 헤더 (숫자 데이터 분리)
-        final_headers = [
-            '시도', '지역구분', '차종구분', '공고파일', '접수방법',
-            '민간공고대수_전체', '민간공고대수_우선순위', '민간공고대수_법인기관', '민간공고대수_택시', '민간공고대수_일반',
-            '접수대수_전체', '접수대수_우선순위', '접수대수_법인기관', '접수대수_택시', '접수대수_일반',
-            '출고대수_전체', '출고대수_우선순위', '출고대수_법인기관', '출고대수_택시', '출고대수_일반',
-            '출고잔여대수_전체', '출고잔여대수_우선순위', '출고잔여대수_법인기관', '출고잔여대수_택시', '출고잔여대수_일반',
-            '비고'
-        ]
+            # 확장된 헤더 (숫자 데이터 분리)
+            final_headers = [
+                '시도', '지역구분', '차종구분', '공고파일', '접수방법',
+                '민간공고대수_전체', '민간공고대수_우선순위', '민간공고대수_법인기관', '민간공고대수_택시', '민간공고대수_일반',
+                '접수대수_전체', '접수대수_우선순위', '접수대수_법인기관', '접수대수_택시', '접수대수_일반',
+                '출고대수_전체', '출고대수_우선순위', '출고대수_법인기관', '출고대수_택시', '출고대수_일반',
+                '출고잔여대수_전체', '출고잔여대수_우선순위', '출고잔여대수_법인기관', '출고잔여대수_택시', '출고잔여대수_일반',
+                '비고'
+            ]
 
-        # 전체 데이터 저장 리스트
-        all_data = []
+            # 전체 데이터 저장 리스트
+            all_data = []
 
-        # 차종별 데이터 수집
-        for vtype in VEHICLE_TYPES:
-            MAX_RETRIES = 3
-            RETRY_DELAY_SEC = 5
+            # 차종별 데이터 수집
+            for vtype in VEHICLE_TYPES:
+                MAX_RETRIES = 3
+                RETRY_DELAY_SEC = 5
 
-            for attempt in range(MAX_RETRIES):
-                if attempt > 0:
-                    print(f"[{vtype}] 재시도 {attempt}/{MAX_RETRIES-1} ({RETRY_DELAY_SEC}초 대기 후)...")
-                    page.wait_for_timeout(RETRY_DELAY_SEC * 1000)
+                for attempt in range(MAX_RETRIES):
+                    if attempt > 0:
+                        print(f"[{vtype}] 재시도 {attempt}/{MAX_RETRIES-1} ({RETRY_DELAY_SEC}초 대기 후)...")
+                        page.wait_for_timeout(RETRY_DELAY_SEC * 1000)
 
-                print(f"\n[{vtype}] 버튼 클릭 중...")
+                    print(f"\n[{vtype}] 버튼 클릭 중...")
 
-                button = page.get_by_role("link", name=vtype, exact=True)
-                button.click()
+                    button = page.get_by_role("link", name=vtype, exact=True)
+                    button.click()
 
-                page.wait_for_load_state('networkidle')
+                    # 콘텐츠 기반 대기: 테이블에 해당 차종 데이터가 로드될 때까지 대기
+                    try:
+                        page.wait_for_function(
+                            """
+                            (expectedType) => {
+                                const table = document.querySelectorAll('table')[1];
+                                if (!table) return false;
+                                const rows = table.querySelectorAll('tbody tr');
+                                if (rows.length === 0) return false;
+                                // 첫 번째 행의 차종구분 컬럼(3번째) 확인
+                                const cell = rows[0].querySelector('td:nth-child(3)');
+                                return cell && cell.textContent.includes(expectedType);
+                            }
+                            """,
+                            arg=vtype,
+                            timeout=15000
+                        )
+                    except Exception as e:
+                        print(f"[{vtype}] 콘텐츠 로드 대기 실패: {e}")
+                        # 폴백: 기존 networkidle 대기
+                        page.wait_for_load_state('networkidle')
+                        page.wait_for_timeout(3000)
 
-                main_table = page.locator('table').nth(1)
-                for _ in range(10):
-                    row_count = main_table.locator('tbody tr').count()
-                    if row_count == 0:
+                    page.wait_for_timeout(int(random.uniform(0.5, 1.0) * 1000))
+
+                    print(f"[{vtype}] 데이터 추출 중...")
+                    data = extract_table_data(page)
+                    print(f"[{vtype}] 추출된 행: {len(data)}개")
+
+                    # 데이터 유효성 검증: 차종구분이 예상값과 일치하는지 확인
+                    validated_data = []
+                    mismatch_count = 0
+                    for row in data:
+                        차종구분 = row[2] if len(row) > 2 else ""
+                        if vtype in 차종구분:
+                            validated_data.append(row)
+                        else:
+                            mismatch_count += 1
+
+                    if mismatch_count > 0:
+                        print(f"[{vtype}] 경고: {mismatch_count}개 행이 차종 불일치로 제외됨")
+
+                    print(f"[{vtype}] 검증된 행: {len(validated_data)}개")
+
+                    if len(validated_data) > 0:
+                        all_data.extend(validated_data)
                         break
-                    page.wait_for_timeout(500)
+                    elif attempt < MAX_RETRIES - 1:
+                        print(f"[{vtype}] 데이터 없음 - 재시도 예정")
+                    else:
+                        print(f"[{vtype}] 경고: {MAX_RETRIES}회 시도 후에도 데이터 없음")
 
-                for _ in range(20):
-                    row_count = main_table.locator('tbody tr').count()
-                    if row_count > 0:
-                        break
-                    page.wait_for_timeout(500)
+            print(f"\n전체 데이터: {len(all_data)}행")
 
-                page.wait_for_timeout(int(random.uniform(0.5, 1.0) * 1000))
+            # 데이터 미리보기
+            if all_data:
+                print("\n데이터 미리보기 (처음 5행):")
+                for idx, row in enumerate(all_data[:5]):
+                    print(f"  행 {idx+1}: 시도={row[0]}, 지역={row[1]}, 차종={row[2]}")
+                    print(f"         민간공고대수: 전체={row[5]}, 우선={row[6]}, 법인={row[7]}, 택시={row[8]}, 일반={row[9]}")
+                    print(f"         출고잔여대수: 전체={row[20]}, 우선={row[21]}, 법인={row[22]}, 택시={row[23]}, 일반={row[24]}")
 
-                print(f"[{vtype}] 데이터 추출 중...")
-                data = extract_table_data(page)
-                print(f"[{vtype}] 추출된 행: {len(data)}개")
+            # data 폴더 자동 생성
+            os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
 
-                if len(data) > 0:
-                    all_data.extend(data)
-                    break
-                elif attempt < MAX_RETRIES - 1:
-                    print(f"[{vtype}] 데이터 없음 - 재시도 예정")
-                else:
-                    print(f"[{vtype}] 경고: {MAX_RETRIES}회 시도 후에도 데이터 없음")
+            # CSV 저장 (출처 정보 포함, BOM 포함 UTF-8로 엑셀 호환)
+            with open(CSV_PATH, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                # 출처 정보를 첫 번째 행에 추가
+                writer.writerow([f"# {DATA_SOURCE}"])
+                writer.writerow(final_headers)
+                writer.writerows(all_data)
 
-        print(f"\n전체 데이터: {len(all_data)}행")
+            print(f"\nCSV 저장 완료: {CSV_PATH}")
+            print(f"총 {len(all_data)}행 x {len(final_headers)}열")
 
-        # 데이터 미리보기
-        if all_data:
-            print("\n데이터 미리보기 (처음 5행):")
-            for idx, row in enumerate(all_data[:5]):
-                print(f"  행 {idx+1}: 시도={row[0]}, 지역={row[1]}, 차종={row[2]}")
-                print(f"         민간공고대수: 전체={row[5]}, 우선={row[6]}, 법인={row[7]}, 택시={row[8]}, 일반={row[9]}")
-                print(f"         출고잔여대수: 전체={row[20]}, 우선={row[21]}, 법인={row[22]}, 택시={row[23]}, 일반={row[24]}")
+            # 차종별 집계
+            print("\n차종별 데이터 행 수:")
+            vehicle_counts = {}
+            for row in all_data:
+                vtype = row[2]
+                vehicle_counts[vtype] = vehicle_counts.get(vtype, 0) + 1
+            for v, c in sorted(vehicle_counts.items()):
+                print(f"  {v}: {c}행")
 
-        # data 폴더 자동 생성
-        os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
+            # 시도별 집계
+            print("\n시도별 데이터 행 수:")
+            province_counts = {}
+            for row in all_data:
+                province = row[0]
+                province_counts[province] = province_counts.get(province, 0) + 1
+            for p, c in sorted(province_counts.items()):
+                print(f"  {p}: {c}행")
 
-        # CSV 저장 (출처 정보 포함, BOM 포함 UTF-8로 엑셀 호환)
-        with open(CSV_PATH, 'w', newline='', encoding='utf-8-sig') as f:
-            writer = csv.writer(f)
-            # 출처 정보를 첫 번째 행에 추가
-            writer.writerow([f"# {DATA_SOURCE}"])
-            writer.writerow(final_headers)
-            writer.writerows(all_data)
-
-        print(f"\nCSV 저장 완료: {CSV_PATH}")
-        print(f"총 {len(all_data)}행 x {len(final_headers)}열")
-
-        # 차종별 집계
-        print("\n차종별 데이터 행 수:")
-        vehicle_counts = {}
-        for row in all_data:
-            vtype = row[2]
-            vehicle_counts[vtype] = vehicle_counts.get(vtype, 0) + 1
-        for v, c in sorted(vehicle_counts.items()):
-            print(f"  {v}: {c}행")
-
-        # 시도별 집계
-        print("\n시도별 데이터 행 수:")
-        province_counts = {}
-        for row in all_data:
-            province = row[0]
-            province_counts[province] = province_counts.get(province, 0) + 1
-        for p, c in sorted(province_counts.items()):
-            print(f"  {p}: {c}행")
-
-        browser.close()
-        return final_headers, all_data
+            return final_headers, all_data
+        finally:
+            browser.close()
 
 
 if __name__ == "__main__":

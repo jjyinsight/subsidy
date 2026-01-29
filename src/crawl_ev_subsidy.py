@@ -8,6 +8,7 @@ import asyncio
 import csv
 import random
 import os
+import traceback
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 # 스크립트 위치 기준 경로 설정
@@ -107,24 +108,32 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
 
             # 데이터 추출
             data = await extract_kg_mobility_data(popup, sido, district, vehicle_category)
-            all_data.extend(data)
-            print(f"케이지모빌리티 {len(data)}건")
+
+            # 차종 검증
+            validated_data = [d for d in data if vehicle_category in d.get("세부차종", "")]
+            if len(validated_data) != len(data):
+                print(f"  경고: {len(data) - len(validated_data)}건 차종 불일치로 제외")
+
+            all_data.extend(validated_data)
+            print(f"케이지모빌리티 {len(validated_data)}건")
 
             # 팝업 닫기
             await popup.close()
 
         except Exception as e:
-            print(f"오류: {str(e)[:50]}")
+            print(f"오류 발생: {sido} {district}")
+            print(f"  에러 타입: {type(e).__name__}")
+            print(f"  에러 메시지: {str(e)}")
+            print(f"  스택 트레이스:")
+            print(traceback.format_exc())
             # 열린 팝업이 있으면 닫기
             try:
                 pages = context.pages
                 for p in pages[1:]:
                     await p.close()
-            except:
+            except Exception:
                 pass
             continue
-
-        await asyncio.sleep(random.uniform(0.2, 0.5))
 
     return all_data
 
@@ -152,20 +161,30 @@ async def crawl_all_regions(page: Page, context: BrowserContext, vehicle_categor
 
             # 데이터 추출
             data = await extract_kg_mobility_data(popup, sido, district, vehicle_category)
-            all_data.extend(data)
-            print(f"케이지모빌리티 {len(data)}건")
+
+            # 차종 검증
+            validated_data = [d for d in data if vehicle_category in d.get("세부차종", "")]
+            if len(validated_data) != len(data):
+                print(f"  경고: {len(data) - len(validated_data)}건 차종 불일치로 제외")
+
+            all_data.extend(validated_data)
+            print(f"케이지모빌리티 {len(validated_data)}건")
 
             # 팝업 닫기
             await popup.close()
 
         except Exception as e:
-            print(f"오류: {str(e)[:50]}")
+            print(f"오류 발생: {sido} {district}")
+            print(f"  에러 타입: {type(e).__name__}")
+            print(f"  에러 메시지: {str(e)}")
+            print(f"  스택 트레이스:")
+            print(traceback.format_exc())
             # 열린 팝업이 있으면 닫기
             try:
                 pages = context.pages
                 for p in pages[1:]:
                     await p.close()
-            except:
+            except Exception:
                 pass
             continue
 
