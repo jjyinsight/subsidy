@@ -15,6 +15,34 @@ from playwright.async_api import async_playwright, Page, BrowserContext
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
+# 재시도 설정
+MAX_RETRIES = 3
+RETRY_DELAY_SEC = 5
+TABLE_LOAD_TIMEOUT_MS = 15000
+
+
+async def wait_for_table_content(page: Page, description: str = "") -> bool:
+    """테이블 콘텐츠 로드 대기 - 지역 링크가 있는 행이 나타날 때까지"""
+    try:
+        print(f"[{description}] 테이블 로드 대기 중...")
+        await page.wait_for_function(
+            """
+            () => {
+                const rows = document.querySelectorAll('table tbody tr');
+                if (rows.length === 0) return false;
+                const linksFound = document.querySelectorAll("a[onclick*='psPopupLocalCarModelPrice']");
+                return linksFound.length > 0;
+            }
+            """,
+            timeout=TABLE_LOAD_TIMEOUT_MS
+        )
+        row_count = await page.eval_on_selector_all("table tbody tr", "rows => rows.length")
+        print(f"[{description}] 테이블 로드 완료 ({row_count}행 발견)")
+        return True
+    except Exception as e:
+        print(f"[{description}] 테이블 로드 대기 실패: {e}")
+        return False
+
 
 async def extract_kg_mobility_data(popup: Page, sido: str, district: str, vehicle_category: str) -> list[dict]:
     """팝업 테이블에서 케이지모빌리티 데이터 추출"""
@@ -57,27 +85,44 @@ async def extract_kg_mobility_data(popup: Page, sido: str, district: str, vehicl
     return results
 
 
-async def get_region_links(page: Page) -> list[tuple[str, str, str]]:
-    """지역 링크 정보 수집 (지역코드, 시도, 지역구분)"""
-    rows = await page.query_selector_all("table tbody tr")
-    region_info = []
+async def get_region_links(page: Page, vehicle_category: str = "") -> list[tuple[str, str, str]]:
+    """지역 링크 정보 수집 (지역코드, 시도, 지역구분) - 재시도 로직 포함"""
 
-    for row in rows:
-        cells = await row.query_selector_all("td")
-        if len(cells) >= 3:
-            sido = await cells[0].inner_text()      # 시도 (예: 경기)
-            district = await cells[1].inner_text()  # 지역구분 (예: 수원시)
+    for attempt in range(MAX_RETRIES):
+        if attempt > 0:
+            print(f"[{vehicle_category}] 재시도 {attempt}/{MAX_RETRIES-1} ({RETRY_DELAY_SEC}초 대기 후)...")
+            await asyncio.sleep(RETRY_DELAY_SEC)
 
-            # onclick에서 지역코드 추출
-            link = await row.query_selector("a[onclick*='psPopupLocalCarModelPrice']")
-            if link:
-                onclick = await link.get_attribute("onclick")
-                if onclick:
-                    parts = onclick.split("'")
-                    region_code = parts[3] if len(parts) >= 4 else ""
-                    region_info.append((region_code, sido.strip(), district.strip()))
+        content_loaded = await wait_for_table_content(page, vehicle_category)
+        if not content_loaded:
+            print(f"[{vehicle_category}] 테이블 로드 실패 - 재시도 예정")
+            continue
 
-    return region_info
+        rows = await page.query_selector_all("table tbody tr")
+        region_info = []
+
+        for row in rows:
+            cells = await row.query_selector_all("td")
+            if len(cells) >= 3:
+                sido = await cells[0].inner_text()
+                district = await cells[1].inner_text()
+
+                link = await row.query_selector("a[onclick*='psPopupLocalCarModelPrice']")
+                if link:
+                    onclick = await link.get_attribute("onclick")
+                    if onclick:
+                        parts = onclick.split("'")
+                        region_code = parts[3] if len(parts) >= 4 else ""
+                        region_info.append((region_code, sido.strip(), district.strip()))
+
+        print(f"[{vehicle_category}] 시도 {attempt+1}: {len(region_info)}개 지역 발견")
+
+        if len(region_info) > 0:
+            return region_info
+
+        print(f"[{vehicle_category}] 지역 없음 - 재시도 예정")
+
+    raise RuntimeError(f"[{vehicle_category}] {MAX_RETRIES}회 시도 후에도 지역을 찾지 못함 - 크롤링 중단")
 
 
 async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_category: str, tab_text: str) -> list[dict]:
@@ -89,10 +134,9 @@ async def crawl_vehicle_type(page: Page, context: BrowserContext, vehicle_catego
     await page.click(f"text={tab_text}")
     await asyncio.sleep(random.uniform(1.5, 2.5))
 
-    # 지역 링크 정보 가져오기 (지역코드, 시도, 지역구분)
-    region_links = await get_region_links(page)
+    region_links = await get_region_links(page, vehicle_category)
     region_count = len(region_links)
-    print(f"[{vehicle_category}] 총 {region_count}개 지역 발견")
+    print(f"[{vehicle_category}] 총 {region_count}개 지역 크롤링 시작")
 
     for i, (region_code, sido, district) in enumerate(region_links):
         print(f"  [{i+1}/{region_count}] {sido} {district} 조회 중...", end=" ", flush=True)
@@ -142,10 +186,9 @@ async def crawl_all_regions(page: Page, context: BrowserContext, vehicle_categor
     """전체 지역 크롤링 (개선된 버전)"""
     all_data = []
 
-    # 지역 링크 정보 가져오기 (지역코드, 시도, 지역구분)
-    region_links = await get_region_links(page)
+    region_links = await get_region_links(page, vehicle_category)
     region_count = len(region_links)
-    print(f"[{vehicle_category}] 총 {region_count}개 지역 발견")
+    print(f"[{vehicle_category}] 총 {region_count}개 지역 크롤링 시작")
 
     for i, (region_code, sido, district) in enumerate(region_links):
         print(f"  [{i+1}/{region_count}] {sido} {district} 조회 중...", end=" ", flush=True)
@@ -216,17 +259,23 @@ async def main():
         await page.select_option("select#year1", "2026")
         await asyncio.sleep(random.uniform(1.5, 2.5))
 
-        # 전기승용 크롤링 (기본 탭 - 먼저 명시적으로 클릭)
         print("\n[전기승용] 탭 선택 중...")
         await page.click("text=전기승용")
-        await asyncio.sleep(random.uniform(1.5, 2.5))
+        content_loaded = await wait_for_table_content(page, "전기승용")
+        if not content_loaded:
+            print("[전기승용] 콘텐츠 대기 실패 - 폴백 대기 사용")
+            await asyncio.sleep(5)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
         passenger_data = await crawl_all_regions(page, context, "전기승용")
         all_results.extend(passenger_data)
 
-        # 전기화물 크롤링
         print("\n[전기화물] 탭 선택 중...")
         await page.click("text=전기화물")
-        await asyncio.sleep(random.uniform(1.5, 2.5))
+        content_loaded = await wait_for_table_content(page, "전기화물")
+        if not content_loaded:
+            print("[전기화물] 콘텐츠 대기 실패 - 폴백 대기 사용")
+            await asyncio.sleep(5)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
         cargo_data = await crawl_all_regions(page, context, "전기화물")
         all_results.extend(cargo_data)
 
