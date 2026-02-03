@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV 보조금 데이터 변화 보고서</title>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #ffffff;
+        color: #1d1d1f;
+        line-height: 1.5;
+        padding: 40px 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    h1 {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+    }
+    .subtitle {
+        color: #86868b;
+        font-size: 14px;
+        margin-bottom: 32px;
+    }
+    h2 {
+        font-size: 20px;
+        font-weight: 600;
+        margin-top: 32px;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #d2d2d7;
+    }
+    h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-top: 24px;
+        margin-bottom: 12px;
+        color: #1d1d1f;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 14px;
+    }
+    th, td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid #d2d2d7;
+    }
+    th {
+        font-weight: 600;
+        color: #1d1d1f;
+        background-color: #fafafa;
+    }
+    td {
+        color: #1d1d1f;
+    }
+    tr:last-child td {
+        border-bottom: none;
+    }
+    .increase {
+        color: #34c759;
+        font-weight: 500;
+    }
+    .decrease {
+        color: #ff3b30;
+        font-weight: 500;
+    }
+    .no-data {
+        color: #86868b;
+        font-style: italic;
+        padding: 20px 0;
+    }
+    .total {
+        color: #86868b;
+        font-size: 14px;
+        margin: 16px 0;
+    }
+    hr {
+        border: none;
+        border-top: 1px solid #d2d2d7;
+        margin: 32px 0;
+    }
+</style>
+
+</head>
+<body>
+<h1>EV 보조금 데이터 변화 보고서</h1>
+<p class="subtitle">2026년 02월 03일 16:33 기준</p>
+<h2>EV 보조금 현황</h2>
+<h3>지역별 총계</h3>
+<table>
+<thead><tr>
+<th>시도</th>
+<th>지역수</th>
+<th>민간공고대수</th>
+<th>출고잔여대수</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>강원</td>
+<td>34</td>
+<td>5,065</td>
+<td>4,630</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>55</td>
+<td>24,831</td>
+<td>17,969</td>
+</tr>
+<tr>
+<td>경남</td>
+<td>34</td>
+<td>6,741</td>
+<td>6,852</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>32</td>
+<td>6,687</td>
+<td>3,193</td>
+</tr>
+<tr>
+<td>공단</td>
+<td>2</td>
+<td>37,167</td>
+<td>37,116</td>
+</tr>
+<tr>
+<td>광주</td>
+<td>2</td>
+<td>1,920</td>
+<td>2,260</td>
+</tr>
+<tr>
+<td>대구</td>
+<td>2</td>
+<td>1,203</td>
+<td>1,415</td>
+</tr>
+<tr>
+<td>대전</td>
+<td>2</td>
+<td>923</td>
+<td>1,080</td>
+</tr>
+<tr>
+<td>부산</td>
+<td>2</td>
+<td>4,372</td>
+<td>4,944</td>
+</tr>
+<tr>
+<td>서울</td>
+<td>2</td>
+<td>8,780</td>
+<td>11,670</td>
+</tr>
+<tr>
+<td>세종</td>
+<td>2</td>
+<td>503</td>
+<td>671</td>
+</tr>
+<tr>
+<td>울산</td>
+<td>2</td>
+<td>2,086</td>
+<td>2,060</td>
+</tr>
+<tr>
+<td>인천</td>
+<td>2</td>
+<td>5,335</td>
+<td>6,780</td>
+</tr>
+<tr>
+<td>전남</td>
+<td>34</td>
+<td>3,166</td>
+<td>1,545</td>
+</tr>
+<tr>
+<td>전북</td>
+<td>4</td>
+<td>243</td>
+<td>0</td>
+</tr>
+<tr>
+<td>충남</td>
+<td>16</td>
+<td>1,755</td>
+<td>285</td>
+</tr>
+<tr>
+<td>충북</td>
+<td>22</td>
+<td>6,107</td>
+<td>6,694</td>
+</tr>
+</tbody>
+</table>
+<h3>시도/차종별 현황</h3>
+<table>
+<thead><tr>
+<th>시도</th>
+<th>차종</th>
+<th>지역수</th>
+<th>민간공고대수</th>
+<th>출고잔여대수</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>강원</td>
+<td>전기승용</td>
+<td>17</td>
+<td>4,084</td>
+<td>3,760</td>
+</tr>
+<tr>
+<td>강원</td>
+<td>전기화물</td>
+<td>17</td>
+<td>981</td>
+<td>870</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>전기승용</td>
+<td>28</td>
+<td>22,287</td>
+<td>16,005</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>전기화물</td>
+<td>27</td>
+<td>2,544</td>
+<td>1,964</td>
+</tr>
+<tr>
+<td>경남</td>
+<td>전기승용</td>
+<td>17</td>
+<td>5,321</td>
+<td>5,422</td>
+</tr>
+<tr>
+<td>경남</td>
+<td>전기화물</td>
+<td>17</td>
+<td>1,420</td>
+<td>1,430</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>전기승용</td>
+<td>16</td>
+<td>5,494</td>
+<td>2,597</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>전기화물</td>
+<td>16</td>
+<td>1,193</td>
+<td>596</td>
+</tr>
+<tr>
+<td>공단</td>
+<td>전기승용</td>
+<td>1</td>
+<td>30,000</td>
+<td>29,950</td>
+</tr>
+<tr>
+<td>공단</td>
+<td>전기화물</td>
+<td>1</td>
+<td>7,167</td>
+<td>7,166</td>
+</tr>
+<tr>
+<td>광주</td>
+<td>전기승용</td>
+<td>1</td>
+<td>1,640</td>
+<td>1,930</td>
+</tr>
+<tr>
+<td>광주</td>
+<td>전기화물</td>
+<td>1</td>
+<td>280</td>
+<td>330</td>
+</tr>
+<tr>
+<td>대구</td>
+<td>전기승용</td>
+<td>1</td>
+<td>1,033</td>
+<td>1,215</td>
+</tr>
+<tr>
+<td>대구</td>
+<td>전기화물</td>
+<td>1</td>
+<td>170</td>
+<td>200</td>
+</tr>
+<tr>
+<td>대전</td>
+<td>전기승용</td>
+<td>1</td>
+<td>786</td>
+<td>920</td>
+</tr>
+<tr>
+<td>대전</td>
+<td>전기화물</td>
+<td>1</td>
+<td>137</td>
+<td>160</td>
+</tr>
+<tr>
+<td>부산</td>
+<td>전기승용</td>
+<td>1</td>
+<td>3,626</td>
+<td>4,103</td>
+</tr>
+<tr>
+<td>부산</td>
+<td>전기화물</td>
+<td>1</td>
+<td>746</td>
+<td>841</td>
+</tr>
+<tr>
+<td>서울</td>
+<td>전기승용</td>
+<td>1</td>
+<td>8,060</td>
+<td>10,474</td>
+</tr>
+<tr>
+<td>서울</td>
+<td>전기화물</td>
+<td>1</td>
+<td>720</td>
+<td>1,196</td>
+</tr>
+<tr>
+<td>세종</td>
+<td>전기승용</td>
+<td>1</td>
+<td>477</td>
+<td>637</td>
+</tr>
+<tr>
+<td>세종</td>
+<td>전기화물</td>
+<td>1</td>
+<td>26</td>
+<td>34</td>
+</tr>
+<tr>
+<td>울산</td>
+<td>전기승용</td>
+<td>1</td>
+<td>1,736</td>
+<td>1,714</td>
+</tr>
+<tr>
+<td>울산</td>
+<td>전기화물</td>
+<td>1</td>
+<td>350</td>
+<td>346</td>
+</tr>
+<tr>
+<td>인천</td>
+<td>전기승용</td>
+<td>1</td>
+<td>4,840</td>
+<td>6,152</td>
+</tr>
+<tr>
+<td>인천</td>
+<td>전기화물</td>
+<td>1</td>
+<td>495</td>
+<td>628</td>
+</tr>
+<tr>
+<td>전남</td>
+<td>전기승용</td>
+<td>17</td>
+<td>2,400</td>
+<td>1,146</td>
+</tr>
+<tr>
+<td>전남</td>
+<td>전기화물</td>
+<td>17</td>
+<td>766</td>
+<td>399</td>
+</tr>
+<tr>
+<td>전북</td>
+<td>전기승용</td>
+<td>2</td>
+<td>160</td>
+<td>0</td>
+</tr>
+<tr>
+<td>전북</td>
+<td>전기화물</td>
+<td>2</td>
+<td>83</td>
+<td>0</td>
+</tr>
+<tr>
+<td>충남</td>
+<td>전기승용</td>
+<td>8</td>
+<td>1,321</td>
+<td>220</td>
+</tr>
+<tr>
+<td>충남</td>
+<td>전기화물</td>
+<td>8</td>
+<td>434</td>
+<td>65</td>
+</tr>
+<tr>
+<td>충북</td>
+<td>전기승용</td>
+<td>11</td>
+<td>5,208</td>
+<td>5,737</td>
+</tr>
+<tr>
+<td>충북</td>
+<td>전기화물</td>
+<td>11</td>
+<td>899</td>
+<td>957</td>
+</tr>
+</tbody>
+</table>
+<h3>유의미한 변화</h3>
+<table>
+<thead><tr>
+<th>시도</th>
+<th>지역</th>
+<th>차종</th>
+<th>항목</th>
+<th>이전</th>
+<th>현재</th>
+<th>변화</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>경북</td>
+<td>경산시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>700</td>
+<td class="increase">+700</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>김천시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>630</td>
+<td class="increase">+630</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>상주시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>450</td>
+<td class="increase">+450</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>영주시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>300</td>
+<td class="increase">+300</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>경산시</td>
+<td>전기승용</td>
+<td>공고대수</td>
+<td>850</td>
+<td>595</td>
+<td class="decrease">-255</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>안산시</td>
+<td>전기승용</td>
+<td>공고대수</td>
+<td>800</td>
+<td>640</td>
+<td class="decrease">-160</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>경산시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>140</td>
+<td class="increase">+140</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>김천시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>110</td>
+<td class="increase">+110</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>안양시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>105</td>
+<td class="increase">+105</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>영덕군</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>100</td>
+<td class="increase">+100</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>상주시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>100</td>
+<td class="increase">+100</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>영주시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>80</td>
+<td class="increase">+80</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>경산시</td>
+<td>전기화물</td>
+<td>공고대수</td>
+<td>170</td>
+<td>119</td>
+<td class="decrease">-51</td>
+</tr>
+<tr>
+<td>전남</td>
+<td>나주시</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>50</td>
+<td class="increase">+50</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>안산시</td>
+<td>전기화물</td>
+<td>공고대수</td>
+<td>200</td>
+<td>160</td>
+<td class="decrease">-40</td>
+</tr>
+<tr>
+<td>공단</td>
+<td>한국환경공단</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>29,971</td>
+<td>29,950</td>
+<td class="decrease">-21</td>
+</tr>
+<tr>
+<td>부산</td>
+<td>부산광역시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>4,123</td>
+<td>4,103</td>
+<td class="decrease">-20</td>
+</tr>
+<tr>
+<td>충북</td>
+<td>충주시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>1,156</td>
+<td>1,136</td>
+<td class="decrease">-20</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>영덕군</td>
+<td>전기화물</td>
+<td>잔여대수</td>
+<td>0</td>
+<td>20</td>
+<td class="increase">+20</td>
+</tr>
+<tr>
+<td>서울</td>
+<td>서울특별시</td>
+<td>전기승용</td>
+<td>잔여대수</td>
+<td>10,493</td>
+<td>10,474</td>
+<td class="decrease">-19</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>KG 모빌리티 보조금 현황</h2>
+<h3>시도별 지역 현황</h3>
+<table>
+<thead><tr>
+<th>시도</th>
+<th>지역 수</th>
+<th>지역구분 목록</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>강원</td>
+<td>17</td>
+<td>강릉시, 고성군, 동해시, 삼척시, 속초시, 양구군, 양양군, 영월군, 원주시, 정선군 외 7개</td>
+</tr>
+<tr>
+<td>경기</td>
+<td>31</td>
+<td>가평군, 고양시, 과천시, 광명시, 광주시, 구리시, 군포시, 김포시, 남양주시, 동두천시 외 21개</td>
+</tr>
+<tr>
+<td>경남</td>
+<td>17</td>
+<td>거제시, 거창군, 고성군, 김해시, 남해군, 밀양시, 사천시, 산청군, 양산시, 의령군 외 7개</td>
+</tr>
+<tr>
+<td>경북</td>
+<td>19</td>
+<td>경산시, 경주시, 구미시, 김천시, 문경시, 봉화군, 상주시, 성주군, 안동시, 영덕군 외 9개</td>
+</tr>
+<tr>
+<td>공단</td>
+<td>1</td>
+<td>한국환경공단</td>
+</tr>
+<tr>
+<td>광주</td>
+<td>1</td>
+<td>광주광역시</td>
+</tr>
+<tr>
+<td>대구</td>
+<td>1</td>
+<td>대구광역시</td>
+</tr>
+<tr>
+<td>대전</td>
+<td>1</td>
+<td>대전광역시</td>
+</tr>
+<tr>
+<td>부산</td>
+<td>1</td>
+<td>부산광역시</td>
+</tr>
+<tr>
+<td>서울</td>
+<td>1</td>
+<td>서울특별시</td>
+</tr>
+<tr>
+<td>세종</td>
+<td>1</td>
+<td>세종특별자치시</td>
+</tr>
+<tr>
+<td>울산</td>
+<td>1</td>
+<td>울산광역시</td>
+</tr>
+<tr>
+<td>인천</td>
+<td>1</td>
+<td>인천광역시</td>
+</tr>
+<tr>
+<td>전남</td>
+<td>21</td>
+<td>강진군, 고흥군, 곡성군, 광양시, 구례군, 나주시, 담양군, 목포시, 무안군, 보성군 외 11개</td>
+</tr>
+<tr>
+<td>전북</td>
+<td>3</td>
+<td>남원시, 무주군, 진안군</td>
+</tr>
+<tr>
+<td>충남</td>
+<td>11</td>
+<td>계룡시, 공주시, 금산군, 논산시, 당진시, 보령시, 부여군, 아산시, 예산군, 청양군 외 1개</td>
+</tr>
+<tr>
+<td>충북</td>
+<td>11</td>
+<td>괴산군, 단양군, 보은군, 영동군, 옥천군, 음성군, 제천시, 증평군, 진천군, 청주시 외 1개</td>
+</tr>
+</tbody>
+</table>
+<p class="total">총 데이터 건수: 1,786건</p>
+<h3>새로 추가된 지역</h3>
+<table>
+<thead><tr>
+<th>시도</th>
+<th>추가 지역 수</th>
+<th>추가된 지역구분</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>경기</td>
+<td>1</td>
+<td>안산시</td>
+</tr>
+<tr>
+<td>전북</td>
+<td>2</td>
+<td>남원시, 진안군</td>
+</tr>
+<tr>
+<td>충남</td>
+<td>1</td>
+<td>논산시</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
