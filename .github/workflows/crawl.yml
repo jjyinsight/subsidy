@@ -20,10 +20,29 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: |
-          pip install playwright
+          pip install playwright holidays
           playwright install chromium
           playwright install-deps
+      - name: Check Korean holiday
+        id: holiday
+        run: |
+          python -c "
+          import holidays, datetime
+          today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).date()
+          kr = holidays.KR()
+          if today in kr:
+              print(f'{today} is a holiday: {kr[today]}')
+              print('skip=true')
+          else:
+              print(f'{today} is not a holiday')
+              print('skip=false')
+          " | tee /dev/stderr | tail -1 | sed 's/skip=//' | xargs -I{} echo "skip={}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger - ignoring holiday check"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Backup previous data
+        if: steps.holiday.outputs.skip != 'true'
         run: |
           if [ -f data/ev_subsidy_data.csv ]; then
             cp data/ev_subsidy_data.csv data/ev_subsidy_data_prev.csv
@@ -33,14 +52,17 @@ jobs:
           fi
 
       - name: Run crawlers
+        if: steps.holiday.outputs.skip != 'true'
         run: |
           python src/crawl_ev_subsidy.py
           python src/ev_crawler.py
 
       - name: Generate report
+        if: steps.holiday.outputs.skip != 'true'
         run: python src/report_generator.py
 
       - name: Check for changes
+        if: steps.holiday.outputs.skip != 'true'
         id: changes
         run: |
           git add data/*.csv reports/*.md reports/*.html
@@ -52,7 +74,7 @@ jobs:
 
       - name: Get report file path
         id: report
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
         run: |
           REPORT_FILE=$(ls -t reports/*.html 2>/dev/null | head -1)
           if [ -n "$REPORT_FILE" ]; then
@@ -60,7 +82,7 @@ jobs:
           fi
 
       - name: Commit results
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -69,7 +91,7 @@ jobs:
           git push
 
       - name: Send email notification
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
