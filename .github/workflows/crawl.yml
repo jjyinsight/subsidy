@@ -9,40 +9,121 @@ on:
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
+  # ──────────────────────────────────────────────────────────
+  # Job 1: 크롤링 필요 여부 판단 (약 15초, 비용 최소화)
+  # ──────────────────────────────────────────────────────────
+  activity-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      should_crawl: ${{ steps.gate.outputs.should_crawl }}
+      crawl_reason: ${{ steps.gate.outputs.crawl_reason }}
+      current_mode: ${{ steps.gate.outputs.current_mode }}
+      mode_changed: ${{ steps.gate.outputs.mode_changed }}
+      prev_mode: ${{ steps.gate.outputs.prev_mode }}
+      new_mode: ${{ steps.gate.outputs.new_mode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install lightweight dependencies
+        run: pip install holidays
+
+      - name: Determine crawl necessity
+        id: gate
+        run: python src/should_crawl.py
+
+      - name: Log decision
+        run: |
+          echo "### Activity Check Result" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: ${{ steps.gate.outputs.current_mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Should Crawl**: ${{ steps.gate.outputs.should_crawl }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: ${{ steps.gate.outputs.crawl_reason }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.gate.outputs.mode_changed }}" = "true" ]; then
+            echo "- **Mode Changed**: ${{ steps.gate.outputs.prev_mode }} → ${{ steps.gate.outputs.new_mode }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # 모드 다운그레이드 시 상태 파일 커밋
+      - name: Commit mode downgrade
+        if: steps.gate.outputs.mode_changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .crawl_state.json
+          git commit -m "Update crawl mode: ${{ steps.gate.outputs.prev_mode }} → ${{ steps.gate.outputs.new_mode }}"
+          git pull --rebase origin main
+          git push
+
+  # ──────────────────────────────────────────────────────────
+  # Job 2: 모드 전환 알림 (다운그레이드 시에만)
+  # ──────────────────────────────────────────────────────────
+  mode-notify:
+    needs: activity-check
+    if: needs.activity-check.outputs.mode_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send mode transition email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ secrets.MAIL_TO }}
+          from: EV 보조금 크롤러
+          subject: >-
+            ${{ needs.activity-check.outputs.new_mode == 'slowing'
+                && '[EV 보조금] 크롤링 빈도 축소 (→ 1일 1회)'
+                || '[EV 보조금] 크롤링 휴면 모드 전환 (→ 주 1회)' }}
+          body: >-
+            ${{ needs.activity-check.outputs.new_mode == 'slowing'
+                && format('크롤링 모드가 Active → Slowing으로 전환되었습니다.
+
+            30일간 추가 데이터 변동이 감지되지 않아, 크롤링 빈도를 하루 2회에서 오전 1회로 축소합니다.
+
+            14일간 추가 변동이 없으면 Dormant(주 1회) 모드로 전환됩니다.
+
+            현재 모드: Slowing (1일 1회, 오전)')
+                || format('크롤링 모드가 Slowing → Dormant로 전환되었습니다.
+
+            14일간 추가 데이터 변동이 감지되지 않아, 크롤링 빈도를 주 1회(월요일 오전)로 축소합니다.
+
+            새 보조금 배정이 감지되면 자동으로 Active 모드로 복귀합니다.
+
+            현재 모드: Dormant (주 1회, 월요일 오전)') }}
+
+  # ──────────────────────────────────────────────────────────
+  # Job 3: 크롤링 실행 (Playwright 설치 포함, 약 4분)
+  # ──────────────────────────────────────────────────────────
   crawl:
+    needs: activity-check
+    if: needs.activity-check.outputs.should_crawl == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Install dependencies
         run: |
           pip install playwright holidays
           playwright install chromium
           playwright install-deps
-      - name: Check Korean holiday
-        id: holiday
-        run: |
-          python -c "
-          import holidays, datetime
-          today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).date()
-          kr = holidays.KR()
-          if today in kr:
-              print(f'{today} is a holiday: {kr[today]}')
-              print('skip=true')
-          else:
-              print(f'{today} is not a holiday')
-              print('skip=false')
-          " | tee /dev/stderr | tail -1 | sed 's/skip=//' | xargs -I{} echo "skip={}" >> $GITHUB_OUTPUT
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual trigger - ignoring holiday check"
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
+
+      - name: Pull latest (in case activity-check pushed)
+        run: git pull --rebase origin main
+
       - name: Backup previous data
-        if: steps.holiday.outputs.skip != 'true'
         run: |
           if [ -f data/ev_subsidy_data.csv ]; then
             cp data/ev_subsidy_data.csv data/ev_subsidy_data_prev.csv
@@ -52,20 +133,49 @@ jobs:
           fi
 
       - name: Run crawlers
-        if: steps.holiday.outputs.skip != 'true'
         run: |
           python src/crawl_ev_subsidy.py
           python src/ev_crawler.py
 
-      - name: Generate report
-        if: steps.holiday.outputs.skip != 'true'
+      - name: Generate report and detect increase
+        id: report_gen
         run: python src/report_generator.py
 
+      - name: Update crawl state on increase
+        id: state_update
+        run: |
+          if [ "${{ steps.report_gen.outputs.increase_triggered }}" = "true" ]; then
+            echo "mode_upgraded=true" >> $GITHUB_OUTPUT
+
+            # .crawl_state.json 읽어서 이전 모드 확인
+            PREV_MODE=$(python -c "import json; print(json.load(open('.crawl_state.json')).get('mode', 'unknown'))")
+            echo "prev_mode=$PREV_MODE" >> $GITHUB_OUTPUT
+
+            # Active 모드로 갱신
+            REASON="${{ steps.report_gen.outputs.increase_reasons }}"
+            python -c "
+          import json
+          from datetime import datetime, timezone, timedelta
+          KST = timezone(timedelta(hours=9))
+          now = datetime.now(KST).strftime('%Y-%m-%d')
+          state = {
+              'last_trigger_date': now,
+              'trigger_reason': '${REASON}'.replace(\"'\", \"\"),
+              'mode': 'active'
+          }
+          with open('.crawl_state.json', 'w', encoding='utf-8') as f:
+              json.dump(state, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+          print(f'Updated .crawl_state.json: Active mode, trigger_date={now}')
+            "
+          else
+            echo "mode_upgraded=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check for changes
-        if: steps.holiday.outputs.skip != 'true'
         id: changes
         run: |
-          git add data/*.csv reports/*.md reports/*.html
+          git add data/*.csv reports/*.md reports/*.html .crawl_state.json
           if git diff --staged --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
@@ -74,7 +184,7 @@ jobs:
 
       - name: Get report file path
         id: report
-        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true'
         run: |
           REPORT_FILE=$(ls -t reports/*.html 2>/dev/null | head -1)
           if [ -n "$REPORT_FILE" ]; then
@@ -82,7 +192,7 @@ jobs:
           fi
 
       - name: Commit results
-        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -90,8 +200,8 @@ jobs:
           git pull --rebase origin main
           git push
 
-      - name: Send email notification
-        if: steps.holiday.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
+      - name: Send data update email
+        if: steps.changes.outputs.changed == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -106,3 +216,30 @@ jobs:
 
             첨부된 HTML 보고서를 확인해주세요.
           attachments: data/ev_subsidy_data.csv,data/kg_mobility_subsidy.csv,${{ steps.report.outputs.file }}
+
+      # 신규 보조금 감지 알림 (모드 업그레이드 시)
+      - name: Send new subsidy alert email
+        if: steps.state_update.outputs.mode_upgraded == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ secrets.MAIL_TO }}
+          from: EV 보조금 크롤러
+          subject: >-
+            ${{ steps.state_update.outputs.prev_mode == 'dormant'
+                && '[EV 보조금] 신규 보조금 배정 감지! 크롤링 재개'
+                || steps.state_update.outputs.prev_mode == 'active'
+                && '[EV 보조금] Active 모드 연장'
+                || '[EV 보조금] 신규 보조금 배정 감지!' }}
+          body: |
+            보조금 데이터 증가가 감지되었습니다!
+
+            감지 내용: ${{ steps.report_gen.outputs.increase_details }}
+            이전 모드: ${{ steps.state_update.outputs.prev_mode }}
+            현재 모드: Active (하루 2회 크롤링)
+
+            Active 모드 30일 타이머가 (재)시작되었습니다.
+            30일간 추가 변동 없으면 Slowing → Dormant 순으로 빈도가 축소됩니다.

@@ -621,6 +621,75 @@ def save_html_report(content: str) -> str:
     return filepath
 
 
+def detect_increase() -> dict:
+    """
+    데이터 증가 감지. 크롤링 후 이전 데이터 대비 증가 여부를 판단한다.
+
+    Returns:
+        dict with keys:
+            triggered: bool - 증가 트리거 발생 여부
+            reasons: list[str] - 트리거 사유 목록
+            details: str - 상세 설명
+    """
+    result = {"triggered": False, "reasons": [], "details": ""}
+    details = []
+
+    # 1. ev_subsidy_data: 민간공고대수_일반 합계 비교
+    ev_gen = EVSubsidyReportGenerator()
+    current_ev = ev_gen.load_data(ev_gen.current_file)
+    prev_ev = ev_gen.load_data(ev_gen.prev_file)
+
+    if current_ev and prev_ev:
+        def sum_field(data, field):
+            total = 0
+            for row in data:
+                try:
+                    total += int(row.get(field, 0) or 0)
+                except ValueError:
+                    pass
+            return total
+
+        curr_total = sum_field(current_ev, "민간공고대수_일반")
+        prev_total = sum_field(prev_ev, "민간공고대수_일반")
+        diff = curr_total - prev_total
+
+        if diff > 0:
+            pct = (diff / prev_total * 100) if prev_total > 0 else 100
+            reason = f"ev_subsidy 민간공고대수 증가 (+{diff:,})"
+            result["reasons"].append(reason)
+            details.append(f"민간공고대수_일반: {prev_total:,} → {curr_total:,} (+{diff:,}, {pct:.1f}%)")
+
+            if pct >= 10:
+                result["triggered"] = True
+
+        # ev_subsidy 행 수 비교
+        if len(current_ev) > len(prev_ev):
+            new_rows = len(current_ev) - len(prev_ev)
+            reason = f"ev_subsidy 행 수 증가 (+{new_rows})"
+            result["reasons"].append(reason)
+            result["triggered"] = True
+            details.append(f"ev_subsidy 행 수: {len(prev_ev):,} → {len(current_ev):,} (+{new_rows})")
+
+    # 2. kg_mobility_subsidy: 행 수 비교
+    kg_gen = KGMobilityReportGenerator()
+    current_kg = kg_gen.load_data(kg_gen.current_file)
+    prev_kg = kg_gen.load_data(kg_gen.prev_file)
+
+    if current_kg and prev_kg:
+        kg_diff = len(current_kg) - len(prev_kg)
+        if kg_diff > 0:
+            reason = f"kg_mobility 행 수 증가 (+{kg_diff})"
+            result["reasons"].append(reason)
+            details.append(f"kg_mobility 행 수: {len(prev_kg):,} → {len(current_kg):,} (+{kg_diff})")
+
+            if kg_diff >= 100:
+                result["triggered"] = True
+
+    result["details"] = "; ".join(details) if details else "변동 없음"
+
+    return result
+
+
 def main():
     print("=" * 60)
     print("EV 보조금 데이터 변화 보고서 생성")
@@ -642,6 +711,23 @@ def main():
     print(report_content[:2000])
     if len(report_content) > 2000:
         print("\n... (이하 생략)")
+
+    # 증가 감지 결과 출력
+    increase = detect_increase()
+    print("\n" + "=" * 60)
+    print("증가 감지 결과:")
+    print("=" * 60)
+    print(f"  triggered={increase['triggered']}")
+    print(f"  reasons={'; '.join(increase['reasons']) if increase['reasons'] else 'none'}")
+    print(f"  details={increase['details']}")
+
+    # GitHub Actions 출력
+    github_output = os.environ.get("GITHUB_OUTPUT", "")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"increase_triggered={'true' if increase['triggered'] else 'false'}\n")
+            f.write(f"increase_reasons={'; '.join(increase['reasons']) if increase['reasons'] else 'none'}\n")
+            f.write(f"increase_details={increase['details']}\n")
 
 
 if __name__ == "__main__":
